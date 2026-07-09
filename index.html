@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HTML5 3 Reel / 5 Payline Slot</title>
+<style>
+  :root { --machine-w: 1376px; --machine-h: 768px; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #273472 0, #0c0b18 55%, #05040a 100%);
+    color: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 24px;
+  }
+  .layout {
+    display: flex;
+    gap: 22px;
+    align-items: flex-start;
+    width: min(100%, 1760px);
+  }
+  .machineScale {
+    width: min(76vw, 1376px);
+    aspect-ratio: 1376 / 768;
+    position: relative;
+  }
+  .machine {
+    position: absolute;
+    width: var(--machine-w);
+    height: var(--machine-h);
+    transform-origin: top left;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: 0 28px 80px rgba(0,0,0,.65);
+  }
+  #slotBg, #reelCanvas, #lineCanvas {
+    position: absolute;
+    inset: 0;
+    width: 1376px;
+    height: 768px;
+  }
+  #slotBg { z-index: 1; }
+  #reelCanvas { z-index: 2; }
+  #lineCanvas { z-index: 5; pointer-events: none; }
+  .readout {
+    position: absolute;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #f9d778;
+    text-shadow: 0 0 8px #04e7ff, 0 2px 3px #000;
+    font-size: 34px;
+    pointer-events: none;
+  }
+  #creditsReadout { left: 258px; top: 562px; width: 228px; height: 84px; }
+  #betReadout { left: 613px; top: 576px; width: 166px; height: 56px; font-size: 30px; }
+  .hotspot {
+    position: absolute;
+    z-index: 10;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hotspot:disabled { cursor: not-allowed; }
+  #spinBtn { left: 943px; top: 502px; width: 188px; height: 168px; border-radius: 50%; }
+  #betDown { left: 527px; top: 544px; width: 77px; height: 77px; border-radius: 50%; }
+  #betUp { left: 790px; top: 543px; width: 82px; height: 82px; border-radius: 50%; }
+  .status {
+    position: absolute;
+    z-index: 8;
+    left: 310px;
+    top: 710px;
+    width: 650px;
+    text-align: center;
+    font-size: 22px;
+    color: #fff3a6;
+    text-shadow: 0 0 10px #000, 0 0 8px #ffbc3c;
+    pointer-events: none;
+  }
+  .winGraphic {
+    position: absolute;
+    z-index: 30;
+    left: 50%;
+    top: 42%;
+    transform: translate(-50%, -50%) scale(.72);
+    min-width: 430px;
+    padding: 24px 42px 28px;
+    border-radius: 30px;
+    border: 3px solid rgba(255, 232, 116, .95);
+    background:
+      radial-gradient(circle at 50% 8%, rgba(255, 255, 218, .32), transparent 33%),
+      linear-gradient(180deg, rgba(16, 110, 36, .96), rgba(4, 35, 22, .97));
+    box-shadow:
+      0 0 24px rgba(255, 236, 118, .85),
+      0 0 62px rgba(39, 255, 116, .35),
+      inset 0 0 28px rgba(255, 240, 145, .28);
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease, transform .28s cubic-bezier(.16, 1.35, .35, 1);
+  }
+  .winGraphic.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .winGraphic.bigWin {
+    min-width: 560px;
+    padding: 30px 58px 34px;
+    border-width: 5px;
+    border-color: #fff3a7;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255, 255, 255, .45), transparent 28%),
+      radial-gradient(circle at 50% 60%, rgba(255, 225, 67, .34), transparent 48%),
+      linear-gradient(180deg, rgba(40, 175, 50, .98), rgba(8, 65, 29, .98));
+    box-shadow:
+      0 0 34px rgba(255, 248, 154, .95),
+      0 0 90px rgba(255, 187, 34, .72),
+      0 0 130px rgba(41, 255, 112, .42),
+      inset 0 0 38px rgba(255, 246, 169, .34);
+  }
+  .winGraphic.bigWin.show {
+    animation: bigWinPop .38s cubic-bezier(.16, 1.35, .35, 1) both, bigWinFlash .42s linear infinite;
+  }
+  .winGraphic.bigWin .winTitle {
+    font-size: 58px;
+    letter-spacing: 5px;
+    color: #fff9bf;
+    text-shadow: 0 0 8px #fff, 0 0 24px #ffd324, 0 5px 0 #9b3d00, 0 10px 14px #000;
+  }
+  .winGraphic.bigWin .winAmount {
+    margin-top: 12px;
+    font-size: 76px;
+    color: #ffe448;
+    text-shadow: 0 0 8px #fff9cd, 0 0 28px #ffb000, 0 5px 0 #934000, 0 10px 16px #000;
+  }
+  .winGraphic.bigWin .winSubtext {
+    font-size: 22px;
+    color: #e2ffe9;
+  }
+  .winGraphic.bigWin::before,
+  .winGraphic.bigWin::after {
+    font-size: 72px;
+    animation: shamrockPulse .48s ease-in-out infinite alternate;
+  }
+  @keyframes bigWinPop {
+    0% { transform: translate(-50%, -50%) scale(.58) rotate(-3deg); }
+    65% { transform: translate(-50%, -50%) scale(1.12) rotate(2deg); }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  }
+  @keyframes bigWinFlash {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.38) saturate(1.25); }
+  }
+  @keyframes shamrockPulse {
+    from { transform: translateY(-50%) scale(.92) rotate(-6deg); }
+    to { transform: translateY(-50%) scale(1.08) rotate(6deg); }
+  }
+  .winGraphic::before,
+  .winGraphic::after {
+    content: "☘";
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 52px;
+    color: #31ff5e;
+    text-shadow: 0 0 10px #fff79a, 0 0 18px #10e65a;
+  }
+  .winGraphic::before { left: 18px; }
+  .winGraphic::after { right: 18px; }
+  .winTitle {
+    display: block;
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 1000;
+    letter-spacing: 3px;
+    color: #fff5ac;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px #fff, 0 0 18px #ffc928, 0 4px 0 #7c3100, 0 7px 9px #000;
+  }
+  .winAmount {
+    display: block;
+    margin-top: 8px;
+    font-size: 58px;
+    line-height: 1;
+    font-weight: 1000;
+    color: #ffd43a;
+    text-shadow: 0 0 6px #fff7c2, 0 0 18px #ffb100, 0 4px 0 #8b3b00, 0 8px 12px #000;
+  }
+  .winSubtext {
+    display: block;
+    margin-top: 5px;
+    font-size: 18px;
+    font-weight: 900;
+    color: #b9ffcf;
+    text-shadow: 0 0 8px #002b12;
+    letter-spacing: 1px;
+  }
+  .outCreditsGraphic {
+    position: absolute;
+    z-index: 36;
+    left: 50%;
+    top: 43%;
+    transform: translate(-50%, -50%) scale(.76);
+    width: 560px;
+    max-width: calc(100% - 80px);
+    padding: 30px 36px 34px;
+    border-radius: 32px;
+    border: 4px solid rgba(255, 237, 135, .98);
+    background:
+      radial-gradient(circle at 50% 8%, rgba(255,255,255,.40), transparent 30%),
+      radial-gradient(circle at 50% 55%, rgba(255,209,52,.32), transparent 48%),
+      linear-gradient(180deg, rgba(20, 150, 46, .98), rgba(5, 46, 25, .98));
+    box-shadow:
+      0 0 30px rgba(255, 238, 124, .9),
+      0 0 80px rgba(37, 255, 112, .38),
+      inset 0 0 34px rgba(255, 248, 160, .28);
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease, transform .28s cubic-bezier(.16, 1.35, .35, 1);
+  }
+  .outCreditsGraphic.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .outCreditsGraphic::before,
+  .outCreditsGraphic::after {
+    content: "☘";
+    position: absolute;
+    top: 49%;
+    transform: translateY(-50%);
+    font-size: 60px;
+    color: #34ff68;
+    text-shadow: 0 0 10px #fff79a, 0 0 20px #10e65a;
+  }
+  .outCreditsGraphic::before { left: 18px; }
+  .outCreditsGraphic::after { right: 18px; }
+  .outCreditsTitle {
+    display: block;
+    font-size: 52px;
+    line-height: 1;
+    font-weight: 1000;
+    letter-spacing: 3px;
+    color: #fff6b6;
+    text-transform: uppercase;
+    text-shadow: 0 0 9px #fff, 0 0 24px #ffd324, 0 5px 0 #9b3d00, 0 10px 14px #000;
+  }
+  .outCreditsSubtext {
+    display: block;
+    margin: 12px 0 22px;
+    font-size: 22px;
+    font-weight: 900;
+    color: #d7ffe2;
+    text-shadow: 0 0 8px #002b12;
+  }
+  .addCreditsBtn {
+    border: 0;
+    border-radius: 999px;
+    padding: 17px 30px 18px;
+    cursor: pointer;
+    color: #3a2100;
+    background: linear-gradient(180deg, #fff7a8, #ffd13b 47%, #f28b12 100%);
+    box-shadow: 0 0 20px rgba(255, 230, 95, .72), inset 0 4px 0 rgba(255,255,255,.45), inset 0 -4px 0 rgba(132,63,0,.28);
+    font-size: 22px;
+    font-weight: 1000;
+    letter-spacing: 1px;
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  }
+  .addCreditsBtn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+  .addCreditsBtn:active { transform: translateY(1px) scale(.99); }
+
+  .paytable {
+    width: 330px;
+    flex: 0 0 330px;
+    background: linear-gradient(180deg, rgba(20,30,68,.95), rgba(6,9,26,.95));
+    border: 2px solid rgba(91,238,255,.75);
+    border-radius: 18px;
+    box-shadow: 0 0 26px rgba(42,224,255,.25), inset 0 0 20px rgba(255,210,80,.13);
+    padding: 16px;
+  }
+  .paytable h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    color: #ffd86a;
+    text-shadow: 0 0 10px #1bd8ff;
+  }
+  .paytable p { margin: 4px 0 12px; color: #b9eefd; font-size: 14px; line-height: 1.35; }
+  .payrow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,.13);
+    font-size: 16px;
+  }
+  .paySymbol {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+  .payIcon {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    flex: 0 0 42px;
+    filter: drop-shadow(0 0 5px rgba(255,216,106,.55));
+  }
+  .payrow span:last-child { color: #ffd86a; font-weight: 800; text-align: right; white-space: nowrap; }
+  .popup {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    place-items: center;
+    background: rgba(0,0,0,.68);
+  }
+  .popup.show { display: grid; }
+  .bonusBox {
+    width: min(720px, 92vw);
+    padding: 24px 28px 30px;
+    border-radius: 26px;
+    background: radial-gradient(circle at top, #343579, #130d2c 70%);
+    border: 3px solid #ffd86a;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(255,216,106,.45), inset 0 0 40px rgba(68,232,255,.18);
+    transform: translateX(-185px);
+  }
+  .bonusBox h2 { margin: 0 0 8px; font-size: 42px; color: #ffe483; text-shadow: 0 0 12px #18eaff; }
+  .bonusChoices { display: flex; justify-content: center; gap: 24px; margin-top: 18px; flex-wrap: wrap; }
+  .potChoice {
+    width: 160px;
+    height: 160px;
+    border: 0;
+    border-radius: 22px;
+    background: rgba(255,255,255,.08);
+    cursor: pointer;
+    box-shadow: inset 0 0 18px rgba(255,255,255,.16), 0 0 18px rgba(255,216,106,.2);
+    transition: transform .16s ease, box-shadow .16s ease;
+  }
+  .potChoice:hover { transform: translateY(-6px) scale(1.03); box-shadow: inset 0 0 18px rgba(255,255,255,.2), 0 0 28px rgba(255,216,106,.55); }
+  .potChoice img { width: 140px; height: 140px; object-fit: contain; pointer-events: none; }
+  .potChoice.dimmed { opacity: .45; transform: scale(.94); }
+  .potChoice.revealed {
+    background: radial-gradient(circle at center, rgba(255,246,168,.20), rgba(255,161,22,.16) 55%, rgba(255,255,255,.06));
+    box-shadow: inset 0 0 26px rgba(255,237,151,.36), 0 0 36px rgba(255,202,45,.62);
+  }
+  .bonusAwardText {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+    font-size: 36px;
+    line-height: 1.05;
+    font-weight: 1000;
+    color: #fff3a1;
+    text-shadow: 0 0 8px #fff, 0 0 16px #ffcf26, 0 3px 0 #8f3d00, 0 5px 7px #000;
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+  #bonusResult { margin-top: 16px; min-height: 28px; color: #fff; font-size: 24px; font-weight: 800; }
+  @media (max-width: 1180px) {
+    .layout { flex-direction: column; align-items: center; }
+    .machineScale { width: min(100vw - 24px, 1376px); }
+    .paytable { width: min(100vw - 24px, 640px); flex-basis: auto; }
+    .bonusBox { transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+  <main class="layout">
+    <section class="machineScale" id="machineScale" aria-label="Slot machine game">
+      <div class="machine" id="machine">
+        <img id="slotBg" src="assets/slotui.jpg" alt="Slot machine UI background" draggable="false">
+        <canvas id="reelCanvas" width="1376" height="768"></canvas>
+        <canvas id="lineCanvas" width="1376" height="768"></canvas>
+        <div class="readout" id="creditsReadout">1000</div>
+        <div class="readout" id="betReadout">5</div>
+        <div class="status" id="status">Adjust bet, then press SPIN.</div>
+        <div class="winGraphic" id="winGraphic" aria-live="polite"><span class="winTitle">Winner!</span><span class="winAmount" id="winAmount">0</span><span class="winSubtext">CREDITS WON</span></div>
+        <div class="outCreditsGraphic" id="outCreditsGraphic" aria-live="polite"><span class="outCreditsTitle">FEELIN' LUCKY?</span><span class="outCreditsSubtext">You are out of credits.</span><button class="addCreditsBtn" id="addCreditsBtn" type="button">ADD MORE CREDITS</button></div>
+        <button class="hotspot" id="betDown" aria-label="Bet down">Bet down</button>
+        <button class="hotspot" id="betUp" aria-label="Bet up">Bet up</button>
+        <button class="hotspot" id="spinBtn" aria-label="Spin">Spin</button>
+      </div>
+    </section>
+
+    <aside class="paytable">
+      <h1>Pay Table</h1>
+      <p>Five paylines: top, middle, bottom, and both diagonals. Wins pay left to right for 3 matching symbols. Wild substitutes for regular symbols.</p>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/jackpot.png" alt="">Jackpot</span><span>500x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/bonus.png" alt="">3 Bonus on payline</span><span>PICK BONUS</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/wild.png" alt="">Wild</span><span>50x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/chest.png" alt="">Treasure Chest</span><span>20x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/pot.png" alt="">Pot of Gold</span><span>15x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/scatter.png" alt="">Scatter in each reel</span><span>12x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/horseshoe.png" alt="">Horseshoe</span><span>10x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/beer.png" alt="">Beer Mug</span><span>7x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/A.png" alt="">A</span><span>5x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/K.png" alt="">K</span><span>4x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/Q.png" alt="">Q</span><span>3x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/J.png" alt="">J</span><span>2x bet</span></div>
+      <div class="payrow"><span class="paySymbol"><img class="payIcon" src="assets/symbols/10.png" alt="">10</span><span>1x bet</span></div>
+    </aside>
+  </main>
+
+  <div class="popup" id="bonusPopup" role="dialog" aria-modal="true" aria-label="Bonus game">
+    <div class="bonusBox">
+      <h2>Bonus Pick!</h2>
+      <p>Choose one pot of gold to reveal your bonus prize.</p>
+      <div class="bonusChoices">
+        <button class="potChoice"><img src="assets/symbols/pot.png" alt="Pot of gold choice 1"></button>
+        <button class="potChoice"><img src="assets/symbols/pot.png" alt="Pot of gold choice 2"></button>
+        <button class="potChoice"><img src="assets/symbols/pot.png" alt="Pot of gold choice 3"></button>
+      </div>
+      <div id="bonusResult"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const REEL_BOXES = [
+    { x: 345, y: 205, w: 195, h: 245 },
+    { x: 592, y: 205, w: 195, h: 245 },
+    { x: 839, y: 205, w: 195, h: 245 }
+  ];
+  // Anticipation glow is intentionally aligned to the visible right reel border
+  // on the UI artwork rather than the smaller clipped symbol window.
+  const RIGHT_REEL_BORDER_BOX = { x: 824, y: 166, w: 236, h: 296, radius: 19 };
+  const CELL_H = 81.6667;
+  const SYMBOL_DRAW_DEFAULT = 76;
+  const SYMBOL_DRAW_OVERRIDES = { '10': 66, J: 66 };
+  const symbols = [
+    '10','J','Q','K','A','beer','horseshoe','pot','chest','wild','jackpot','scatter','bonus'
+  ];
+  const symbolLabels = {
+    '10':'10', J:'J', Q:'Q', K:'K', A:'A', beer:'Beer Mug', horseshoe:'Horseshoe',
+    pot:'Pot of Gold', chest:'Treasure Chest', wild:'Wild', jackpot:'Jackpot',
+    scatter:'Scatter', bonus:'Bonus'
+  };
+  const regularPays = { '10':1, J:2, Q:3, K:4, A:5, beer:7, horseshoe:10, pot:15, chest:20, wild:50, jackpot:500 };
+  const lines = [
+    { name:'Top', cells:[[0,0],[1,0],[2,0]] },
+    { name:'Middle', cells:[[0,1],[1,1],[2,1]] },
+    { name:'Bottom', cells:[[0,2],[1,2],[2,2]] },
+    { name:'Diagonal Down', cells:[[0,0],[1,1],[2,2]] },
+    { name:'Diagonal Up', cells:[[0,2],[1,1],[2,0]] }
+  ];
+
+  const canvas = document.getElementById('reelCanvas');
+  const ctx = canvas.getContext('2d');
+  const lineCanvas = document.getElementById('lineCanvas');
+  const lctx = lineCanvas.getContext('2d');
+  const creditsReadout = document.getElementById('creditsReadout');
+  const betReadout = document.getElementById('betReadout');
+  const status = document.getElementById('status');
+  const winGraphic = document.getElementById('winGraphic');
+  const winAmount = document.getElementById('winAmount');
+  const outCreditsGraphic = document.getElementById('outCreditsGraphic');
+  const addCreditsBtn = document.getElementById('addCreditsBtn');
+  const spinBtn = document.getElementById('spinBtn');
+  const betUp = document.getElementById('betUp');
+  const betDown = document.getElementById('betDown');
+  const popup = document.getElementById('bonusPopup');
+  const bonusResult = document.getElementById('bonusResult');
+  const potChoices = [...document.querySelectorAll('.potChoice')];
+  const stopSound = new Audio('assets/reelstop.mp3');
+  stopSound.volume = 0.65;
+  const clickSound = new Audio('assets/click.mp3');
+  clickSound.volume = 0.72;
+
+  const imgs = {};
+  let loaded = 0;
+  symbols.forEach(s => {
+    const img = new Image();
+    img.onload = () => { loaded++; if (loaded === symbols.length) drawStatic(); };
+    img.src = `assets/symbols/${s}.png`;
+    imgs[s] = img;
+  });
+
+  let credits = 1000;
+  let bet = 5;
+  let spinning = false;
+  let grid = [randomReel(), randomReel(), randomReel()];
+  let reels = [];
+  let currentBetForBonus = 0;
+  let anticipationActive = false;
+  let winGraphicTimer = null;
+
+  function fitMachine() {
+    const scaleWrap = document.getElementById('machineScale');
+    const machine = document.getElementById('machine');
+    const scale = scaleWrap.clientWidth / 1376;
+    machine.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', fitMachine);
+  fitMachine();
+
+  function updateReadouts() {
+    creditsReadout.textContent = credits.toLocaleString();
+    betReadout.textContent = bet.toLocaleString();
+    betDown.disabled = spinning || bet <= 5;
+    betUp.disabled = spinning || bet >= 100 || bet + 5 > credits;
+    spinBtn.disabled = spinning || credits < bet;
+    if (!spinning) checkOutOfCredits();
+  }
+
+  function randomSymbol() {
+    // Weighted strip: bonus appears a bit more often than before, but remains uncommon.
+    const bag = ['10','10','J','J','Q','Q','K','K','A','A','beer','beer','horseshoe','horseshoe','pot','chest','wild','jackpot','scatter','bonus','bonus'];
+    return bag[Math.floor(Math.random() * bag.length)];
+  }
+  function randomReel() { return [randomSymbol(), randomSymbol(), randomSymbol()]; }
+
+  function createSpinGrid() {
+    const nextGrid = [randomReel(), randomReel(), randomReel()];
+    // Small nudge for bonus anticipation: occasionally align bonus on reels 1 and 2.
+    // Only a small fraction complete on reel 3, keeping the bonus valuable.
+    if (!hasBonusPayline(nextGrid) && Math.random() < 0.035) {
+      const line = lines[Math.floor(Math.random() * lines.length)];
+      const [left, middle, right] = line.cells;
+      nextGrid[left[0]][left[1]] = 'bonus';
+      nextGrid[middle[0]][middle[1]] = 'bonus';
+      nextGrid[right[0]][right[1]] = Math.random() < 0.14 ? 'bonus' : randomNonBonusSymbol();
+    }
+    return nextGrid;
+  }
+
+  function randomNonBonusSymbol() {
+    let sym;
+    do { sym = randomSymbol(); } while (sym === 'bonus');
+    return sym;
+  }
+
+  function hasBonusPayline(testGrid) {
+    return lines.some(line => line.cells.every(([reel,row]) => testGrid[reel][row] === 'bonus'));
+  }
+
+  function hasBonusOnLeftReel() {
+    return grid[0].includes('bonus');
+  }
+
+  function hasTwoReelBonusAnticipation() {
+    return lines.some(line => {
+      const [left, middle] = line.cells;
+      return grid[left[0]][left[1]] === 'bonus' && grid[middle[0]][middle[1]] === 'bonus';
+    });
+  }
+
+  function drawSymbol(sym, x, y, w, h) {
+    const img = imgs[sym];
+    if (!img || !img.complete) return;
+    const targetDraw = SYMBOL_DRAW_OVERRIDES[sym] || SYMBOL_DRAW_DEFAULT;
+    const maxW = targetDraw;
+    const maxH = targetDraw;
+    const ratio = Math.min(maxW / img.width, maxH / img.height);
+    const dw = img.width * ratio;
+    const dh = img.height * ratio;
+    const dx = x + (w - dw) / 2;
+    const dy = y + (h - dh) / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255, 236, 128, .45)';
+    ctx.shadowBlur = 12;
+    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.restore();
+  }
+
+  function drawStatic() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let r = 0; r < 3; r++) {
+      const box = REEL_BOXES[r];
+      ctx.save();
+      roundClip(ctx, box.x, box.y, box.w, box.h, 10);
+      for (let row = 0; row < 3; row++) {
+        drawSymbol(grid[r][row], box.x, box.y + row * CELL_H, box.w, CELL_H);
+      }
+      ctx.restore();
+    }
+  }
+
+  function roundClip(c, x, y, w, h, rad) {
+    c.beginPath();
+    c.moveTo(x + rad, y);
+    c.arcTo(x + w, y, x + w, y + h, rad);
+    c.arcTo(x + w, y + h, x, y + h, rad);
+    c.arcTo(x, y + h, x, y, rad);
+    c.arcTo(x, y, x + w, y, rad);
+    c.closePath();
+    c.clip();
+  }
+
+  function easeOutQuint(t) { return 1 - Math.pow(1 - t, 5); }
+
+  function drawSpin(now) {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    lctx.clearRect(0,0,lineCanvas.width,lineCanvas.height);
+    let allDone = true;
+    for (let r = 0; r < 3; r++) {
+      const reel = reels[r];
+      const box = REEL_BOXES[r];
+      const t = Math.min(1, (now - reel.start) / reel.duration);
+      const eased = easeOutQuint(t);
+      const offset = reel.travel * (1 - eased);
+      const base = Math.floor(offset / CELL_H);
+      const frac = offset % CELL_H;
+      if (t < 1) allDone = false;
+      if (t >= 0.84 && !reel.stopSoundPlayed) {
+        reel.stopSoundPlayed = true;
+        playReelStop();
+      }
+      if (t >= 1 && !reel.stopped) {
+        reel.stopped = true;
+        if (r === 0 && hasBonusOnLeftReel()) playAnticipationSound('left');
+        if (r === 1 && hasTwoReelBonusAnticipation()) {
+          anticipationActive = true;
+          status.textContent = 'Bonus chance! Waiting on reel 3...';
+          playAnticipationSound('middle');
+        }
+      }
+      ctx.save();
+      roundClip(ctx, box.x, box.y, box.w, box.h, 10);
+      for (let k = -1; k < 5; k++) {
+        const sym = reel.sequence[(base + k + reel.sequence.length) % reel.sequence.length];
+        drawSymbol(sym, box.x, box.y + k * CELL_H - frac, box.w, CELL_H);
+      }
+      ctx.restore();
+    }
+    if (anticipationActive && !reels[2].stopped) drawAnticipationGlow(now);
+    if (!allDone) requestAnimationFrame(drawSpin);
+    else finishSpin();
+  }
+
+  function startSpin() {
+    if (spinning) return;
+    if (credits < bet) {
+      checkOutOfCredits();
+      return;
+    }
+    hideOutOfCreditsGraphic();
+    ensureAudio();
+    lctx.clearRect(0,0,lineCanvas.width,lineCanvas.height);
+    hideWinGraphic();
+    spinning = true;
+    currentBetForBonus = bet;
+    credits -= bet;
+    status.textContent = 'Spinning...';
+    updateReadouts();
+    grid = createSpinGrid();
+    anticipationActive = false;
+    const bonusAnticipation = hasTwoReelBonusAnticipation();
+    const now = performance.now();
+    reels = grid.map((col, r) => {
+      const seq = [...col];
+      while (seq.length < 48) seq.push(randomSymbol());
+      return {
+        sequence: seq,
+        start: now,
+        duration: 1700 + r * 520 + (r === 2 && bonusAnticipation ? 2300 : 0),
+        travel: (31 + r * 10 + (r === 2 && bonusAnticipation ? 24 : 0)) * CELL_H,
+        stopped: false,
+        stopSoundPlayed: false
+      };
+    });
+    requestAnimationFrame(drawSpin);
+  }
+
+  function finishSpin() {
+    spinning = false;
+    anticipationActive = false;
+    drawStatic();
+    const result = evaluateWins();
+    const isBigWin = result.totalWin >= bet * 20;
+    if (result.totalWin > 0) {
+      credits += result.totalWin;
+      if (isBigWin) playCelebrationSound();
+      else playWinSound();
+    }
+    drawWinningLines(result.winningLineIndexes);
+    updateReadouts();
+    if (result.bonusTriggered) {
+      if (result.totalWin > 0) showWinGraphic(result.totalWin, isBigWin);
+      status.textContent = 'Bonus triggered!';
+      setTimeout(openBonus, 650);
+    } else if (result.totalWin > 0) {
+      showWinGraphic(result.totalWin, isBigWin);
+      status.textContent = 'Press SPIN to play again.';
+    } else {
+      status.textContent = credits < bet ? '' : 'No win. Spin again!';
+    }
+    checkOutOfCredits();
+  }
+
+  function showWinGraphic(amount, isBigWin = false) {
+    if (winGraphicTimer) clearTimeout(winGraphicTimer);
+    winGraphic.classList.toggle('bigWin', isBigWin);
+    winGraphic.querySelector('.winTitle').textContent = isBigWin ? 'BIG WIN!' : 'Winner!';
+    winGraphic.querySelector('.winSubtext').textContent = isBigWin ? 'WOW YOU ARE LUCKY!' : 'CREDITS';
+    winAmount.textContent = amount.toLocaleString();
+    winGraphic.classList.add('show');
+    winGraphicTimer = setTimeout(hideWinGraphic, isBigWin ? 4200 : 2800);
+  }
+
+  function hideWinGraphic() {
+    if (winGraphicTimer) {
+      clearTimeout(winGraphicTimer);
+      winGraphicTimer = null;
+    }
+    winGraphic.classList.remove('show', 'bigWin');
+  }
+
+  function checkOutOfCredits() {
+    const shouldShow = !spinning && credits < bet;
+    outCreditsGraphic.classList.toggle('show', shouldShow);
+    if (shouldShow) status.textContent = '';
+  }
+
+  function hideOutOfCreditsGraphic() {
+    outCreditsGraphic.classList.remove('show');
+  }
+
+  function addMoreCredits() {
+    ensureAudio();
+    playButtonClick();
+    credits += 1000;
+    hideOutOfCreditsGraphic();
+    status.textContent = '1,000 credits added. Good luck!';
+    updateReadouts();
+  }
+
+  function evaluateWins() {
+    let totalWin = 0;
+    const messages = [];
+    const winningLineIndexes = [];
+    let bonusTriggered = false;
+
+    lines.forEach((line, idx) => {
+      const vals = line.cells.map(([reel,row]) => grid[reel][row]);
+      if (vals.every(v => v === 'bonus')) {
+        bonusTriggered = true;
+        winningLineIndexes.push(idx);
+        messages.push(`${line.name}: Bonus`);
+        return;
+      }
+      if (vals.some(v => v === 'bonus' || v === 'scatter')) return;
+      let target = vals.find(v => v !== 'wild') || 'wild';
+      const isWin = vals.every(v => v === target || v === 'wild');
+      if (isWin && regularPays[target]) {
+        const pay = regularPays[target] * bet;
+        totalWin += pay;
+        winningLineIndexes.push(idx);
+        messages.push(`${line.name}: ${symbolLabels[target]} ${regularPays[target]}x`);
+      }
+    });
+
+    const scatterOnEveryReel = grid.every(col => col.includes('scatter'));
+    if (scatterOnEveryReel) {
+      const pay = 12 * bet;
+      totalWin += pay;
+      messages.push(`Scatter 12x`);
+    }
+    return { totalWin, messages, winningLineIndexes, bonusTriggered };
+  }
+
+  function drawWinningLines(indexes) {
+    lctx.clearRect(0,0,lineCanvas.width,lineCanvas.height);
+    if (!indexes.length) return;
+    lctx.save();
+    lctx.lineWidth = 8;
+    lctx.lineCap = 'round';
+    lctx.shadowColor = '#fff176';
+    lctx.shadowBlur = 18;
+    indexes.forEach((lineIdx, i) => {
+      const line = lines[lineIdx];
+      lctx.beginPath();
+      line.cells.forEach(([r,row], j) => {
+        const box = REEL_BOXES[r];
+        const x = box.x + box.w / 2;
+        const y = box.y + row * CELL_H + CELL_H / 2;
+        if (j === 0) lctx.moveTo(x,y); else lctx.lineTo(x,y);
+      });
+      lctx.strokeStyle = i % 2 ? '#00f5ff' : '#ffd84f';
+      lctx.stroke();
+    });
+    lctx.restore();
+  }
+
+
+  function drawAnticipationGlow(now) {
+    const box = RIGHT_REEL_BORDER_BOX;
+    const x = box.x;
+    const y = box.y;
+    const w = box.w;
+    const h = box.h;
+    const r = box.radius;
+    const sweep = (Math.sin(now / 210) + 1) / 2;
+    const grad = lctx.createLinearGradient(x + w * sweep, y, x + w * (1 - sweep), y + h);
+    grad.addColorStop(0, 'rgba(255, 232, 115, .20)');
+    grad.addColorStop(0.45, 'rgba(255, 178, 34, .92)');
+    grad.addColorStop(1, 'rgba(255, 246, 178, .32)');
+    lctx.save();
+    lctx.lineCap = 'round';
+    lctx.lineJoin = 'round';
+
+    // Soft outer aura, centered around the reel border.
+    lctx.lineWidth = 18;
+    lctx.shadowColor = '#ffcc37';
+    lctx.shadowBlur = 30 + 8 * Math.sin(now / 130);
+    lctx.strokeStyle = 'rgba(255, 202, 55, .24)';
+    lctx.beginPath();
+    roundedRectPath(lctx, x, y, w, h, r);
+    lctx.stroke();
+
+    // Animated gold sweep directly over the border line.
+    lctx.lineWidth = 7;
+    lctx.shadowBlur = 18;
+    lctx.strokeStyle = grad;
+    lctx.beginPath();
+    roundedRectPath(lctx, x, y, w, h, r);
+    lctx.stroke();
+
+    // Thin bright glass highlight.
+    lctx.lineWidth = 2;
+    lctx.shadowBlur = 8;
+    lctx.strokeStyle = 'rgba(255,255,210,.78)';
+    lctx.beginPath();
+    roundedRectPath(lctx, x, y, w, h, r);
+    lctx.stroke();
+    lctx.restore();
+  }
+
+  function roundedRectPath(c, x, y, w, h, rad) {
+    c.moveTo(x + rad, y);
+    c.arcTo(x + w, y, x + w, y + h, rad);
+    c.arcTo(x + w, y + h, x, y + h, rad);
+    c.arcTo(x, y + h, x, y, rad);
+    c.arcTo(x, y, x + w, y, rad);
+    c.closePath();
+  }
+
+  function openBonus() {
+    bonusResult.textContent = '';
+    potChoices.forEach((btn, i) => {
+      btn.disabled = false;
+      btn.classList.remove('revealed', 'dimmed');
+      btn.innerHTML = `<img src="assets/symbols/pot.png" alt="Pot of gold choice ${i + 1}">`;
+    });
+    popup.classList.add('show');
+  }
+
+  function resolveBonusPick(event) {
+    const picked = event.currentTarget;
+    potChoices.forEach(btn => {
+      btn.disabled = true;
+      if (btn !== picked) btn.classList.add('dimmed');
+    });
+    const mult = Math.floor(Math.random() * 96) + 5;
+    const award = mult * currentBetForBonus;
+    credits += award;
+    picked.classList.add('revealed');
+    picked.innerHTML = `<div class="bonusAwardText">${award.toLocaleString()}<br>credits</div>`;
+    bonusResult.textContent = `You found ${mult}x the bet!`;
+    const isBigBonusWin = award >= currentBetForBonus * 20;
+    if (isBigBonusWin) playCelebrationSound();
+    else playWinSound();
+    updateReadouts();
+    setTimeout(() => {
+      popup.classList.remove('show');
+      showWinGraphic(award, isBigBonusWin);
+      status.textContent = `Bonus paid ${award} credits. Press SPIN to play again.`;
+    }, 3200);
+  }
+
+  let audioCtx;
+  function ensureAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function playReelStop() {
+    try {
+      const s = stopSound.cloneNode();
+      s.volume = 0.65;
+      s.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  function playButtonClick() {
+    try {
+      const s = clickSound.cloneNode();
+      s.volume = 0.72;
+      s.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  function playAnticipationSound(stage) {
+    ensureAudio();
+    const now = audioCtx.currentTime;
+    const freqs = stage === 'middle' ? [392, 494, 587, 740, 880] : [330, 392, 494];
+    freqs.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + i * 0.11);
+      gain.gain.setValueAtTime(0, now + i * 0.11);
+      gain.gain.linearRampToValueAtTime(stage === 'middle' ? 0.16 : 0.11, now + i * 0.11 + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.11 + 0.22);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i * 0.11);
+      osc.stop(now + i * 0.11 + 0.25);
+    });
+  }
+
+  function playWinSound() {
+    ensureAudio();
+    const now = audioCtx.currentTime;
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + i * 0.08);
+      gain.gain.setValueAtTime(0, now + i * 0.08);
+      gain.gain.linearRampToValueAtTime(0.22, now + i * 0.08 + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.38);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i * 0.08);
+      osc.stop(now + i * 0.08 + 0.42);
+    });
+  }
+
+  function playCelebrationSound() {
+    ensureAudio();
+    const now = audioCtx.currentTime;
+
+    // Bright layered fanfare. Uses Web Audio so no extra audio file is required.
+    [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = i % 2 ? 'triangle' : 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + i * 0.1);
+      gain.gain.setValueAtTime(0, now + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.18, now + i * 0.1 + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.55);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i * 0.1);
+      osc.stop(now + i * 0.1 + 0.62);
+    });
+
+    [196, 246.94, 261.63].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, now + i * 0.16);
+      gain.gain.setValueAtTime(0, now + i * 0.16);
+      gain.gain.linearRampToValueAtTime(0.08, now + i * 0.16 + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.16 + 0.75);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i * 0.16);
+      osc.stop(now + i * 0.16 + 0.85);
+    });
+
+    for (let i = 0; i < 18; i++) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(900 + Math.random() * 1400, now + 0.15 + i * 0.035);
+      gain.gain.setValueAtTime(0, now + 0.15 + i * 0.035);
+      gain.gain.linearRampToValueAtTime(0.045, now + 0.16 + i * 0.035);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25 + i * 0.035);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + 0.15 + i * 0.035);
+      osc.stop(now + 0.27 + i * 0.035);
+    }
+  }
+
+  betUp.addEventListener('click', () => {
+    playButtonClick();
+    if (!spinning && bet < 100 && bet + 5 <= credits) { bet += 5; updateReadouts(); }
+  });
+  betDown.addEventListener('click', () => {
+    playButtonClick();
+    if (!spinning && bet > 5) { bet -= 5; updateReadouts(); }
+  });
+  spinBtn.addEventListener('click', () => {
+    playButtonClick();
+    startSpin();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+
+    const activeElement = document.activeElement;
+    const isPopupControl = activeElement && activeElement.closest && (
+      activeElement.closest('#bonusPopup') || activeElement.closest('#outCreditsGraphic')
+    );
+    if (isPopupControl) return;
+
+    event.preventDefault();
+    if (popup.classList.contains('show') || spinning) return;
+    playButtonClick();
+    startSpin();
+  });
+
+  potChoices.forEach(btn => btn.addEventListener('click', resolveBonusPick));
+  addCreditsBtn.addEventListener('click', addMoreCredits);
+  updateReadouts();
+})();
+</script>
+</body>
+</html>
